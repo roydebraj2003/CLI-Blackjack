@@ -103,12 +103,12 @@ User authenticate_player(PGconn *conn, const char *username, const char *passwor
             user.password[sizeof(user.password) - 1] = '\0';
             user.balance = atoi(PQgetvalue(res, 0, 3));
             user.total_winnings = atoi(PQgetvalue(res, 0, 4));
+		
+	    printf("==========================\n");
             printf("Welcome %s\n", username);
         } else {
             printf("Incorrect password\n");
         }
-    } else {
-        printf("User not found\n");
     }
     
     PQclear(res);

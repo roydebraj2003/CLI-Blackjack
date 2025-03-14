@@ -424,28 +424,43 @@ User user_options(PGconn *conn) {
     
     return user;
 }
+void loading_terminal() {
+	 printf("********************************************\n");
+    printf("*                                          *\n");
+    printf("*            WELCOME TO BLACKJACK          *\n");
+    printf("*                                          *\n");
+    printf("********************************************\n");
+    printf("\n");
+    printf("Blackjack is a classic card game of strategy and chance, where\n");
+    printf("players compete against the dealer to reach a hand value closest\n");
+    printf("to 21 without exceeding it. This command-line version offers an\n");
+    printf("immersive experience with realistic gameplay mechanics.\n");
+    printf("\n");
+    printf("Features include user authentication, balance tracking, and a\n");
+    printf("leaderboard to showcase top players. All data is securely managed\n");
+    printf("using a PostgreSQL database.\n");
+    printf("\n");
+    printf("Sharpen your strategy, manage your bets, and aim for the top!\n");
+    printf("\n");
+    printf("********************************************\n");
+}
 
 int main() {
 
     PGconn *conn = NULL;
     
-
-    printf("Connecting to database...\n");
     const char *db_uri = getenv("DB_URI");
     conn = connect_db(db_uri);
     
     srand(time(NULL));
     
-    printf("***********************************\n");
-    printf("*          WELCOME TO             *\n");
-    printf("*          BLACKJACK!             *\n");
-    printf("***********************************\n");
+    loading_terminal();
     
     User user = user_options(conn);
     
 
     if (p1.balance <= 0) {
-        printf("Invalid buy-in amount. Please enter a positive number.\n");
+        printf("You have used all your money :( Wait for a while ...\n");
         if (conn) close_db(conn);
         return 1;
     }
@@ -457,12 +472,13 @@ int main() {
     buildDeck(deck);
     shuffle(deck);
     
-    if (conn) {
-        check_leaderboards(conn);
-    }
     
     char choice;
     do {
+	    if(conn && strcmp(user.username, "Guest") != 0) {
+
+		check_leaderboards(conn);
+	    }
         int result = gameLoop(user, conn);
         if (result == -1 || p1.balance <= 0) {
             if (p1.balance <= 0) {
@@ -476,8 +492,11 @@ int main() {
         
     } while(choice == 'y' || choice == 'Y');
 
+    if(conn && strcmp(user.username, "Guest") != 0) {
     printf("Thank you for playing - your final balance: $%d\n", p1.balance);
-    
+    } else {
+	printf("Thank you for playing.");
+    }
     if (conn && strlen(user.username) > 0 && strcmp(user.username, "Guest") != 0) {
         user.balance = p1.balance;
         user.total_winnings = p1.total_winnings;
