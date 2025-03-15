@@ -217,7 +217,7 @@ int gameLoop(User user, PGconn *conn) {
     p1.isBusted = 0;
     d1.isBusted = 0; 
     d1.revealCard = 0;
-    
+    p1.hasSplit = 0;
     showBalance(&p1);
     if (p1.balance <= 0) {
         printf("You're out of money! Game over.\n");
@@ -307,7 +307,158 @@ int gameLoop(User user, PGconn *conn) {
             }
             break;
         } else if (action == SPLIT && canSplit) {
-            printf("Splitting cards... (to be implemented)\n");
+            if (*(p1.handSize) != 2) {
+                printf("You can only split on your initial two cards\n");
+                continue;
+            }
+    
+
+            if (p1.balance < p1.currentBet) {
+                printf("Insufficient funds to split. You need $%d more.\n", 
+                       p1.currentBet - p1.balance);
+                continue;
+            }
+    
+           
+            p1.balance -= p1.currentBet;
+            user.balance = p1.balance;
+            update_balance(conn, user.username, user.balance);
+            printf("Second bet placed: $%d\n", p1.currentBet);
+    
+            int sh1 = 0;  
+            int sh2 = 0; 
+            Card split1[12];  
+            Card split2[12];  
+    
+            split1[sh1++] = p1.hand[0];
+
+            split2[sh2++] = p1.hand[1];
+    
+
+            split1[sh1++] = deck[--top];
+            split2[sh2++] = deck[--top];
+    
+            int hand1Busted = 0;
+            int hand2Busted = 0;
+            int hand1Value = 0;
+            int hand2Value = 0;
+    
+
+            printf("\n--- Playing Hand 1 ---\n");
+            show(split1, &sh1, 1);  
+            hand1Value = calc(split1, &sh1);
+    
+            while (1) {
+                if (hand1Value > 21) {
+                    printf("Hand 1 busted!\n");
+                    hand1Busted = 1;
+                    break;
+                }
+        
+                printf("Options for Hand 1: (1) Hit (2) Stand\n");
+                int choice;
+                scanf("%d", &choice);
+        
+                if (choice == 1) {  // Hit
+                    push(split1, &sh1, deck[--top]);
+                    show(split1, &sh1, 1);
+                    hand1Value = calc(split1, &sh1);
+                } else if (choice == 2) {  // Stand
+                    break;
+                } else {
+                    printf("Invalid choice. Try again.\n");
+                }
+            }
+    
+
+            printf("\n--- Playing Hand 2 ---\n");
+            show(split2, &sh2, 1);  
+            hand2Value = calc(split2, &sh2);
+    
+            while (1) {
+                if (hand2Value > 21) {
+                    printf("Hand 2 busted!\n");
+                    hand2Busted = 1;
+                    break;
+                }
+        
+                printf("Options for Hand 2: (1) Hit (2) Stand\n");
+                int choice;
+                scanf("%d", &choice);
+        
+                if (choice == 1) {  // Hit
+                    push(split2, &sh2, deck[--top]);
+                    show(split2, &sh2, 1);
+                    hand2Value = calc(split2, &sh2);
+                } else if (choice == 2) {  // Stand
+                    break;
+                } else {
+                    printf("Invalid choice. Try again.\n");
+                }
+            }
+    
+
+            printf("\nDealer reveals cards:\n");
+            show(d1.hand, d1.handSize, 1);
+    
+            while (calc(d1.hand, d1.handSize) < 17) {
+                printf("\nDealer hits...\n");
+                if (top > 0) { 
+                    push(d1.hand, d1.handSize, deck[--top]);
+                    show(d1.hand, d1.handSize, 1);
+                } else {
+                    printf("Error: Deck is empty\n");
+                    return -1;
+                }
+            }
+    
+            int dealerScore = calc(d1.hand, d1.handSize);
+            int dealerBusted = (dealerScore > 21);
+    
+            printf("\nFinal scores - Dealer: %d\n", dealerScore);
+            printf("Hand 1: %d, Hand 2: %d\n", hand1Value, hand2Value);
+    
+
+            if (!hand1Busted) {
+                if (dealerBusted || hand1Value > dealerScore) {
+                    printf("Hand 1 wins! You win $%d!\n", p1.currentBet);
+                    p1.balance += p1.currentBet * 2;
+                    p1.total_winnings += p1.currentBet;
+                } else if (hand1Value == dealerScore) {
+                    printf("Hand 1 push! Your $%d bet is returned.\n", p1.currentBet);
+                    p1.balance += p1.currentBet;
+                } else {
+                    printf("Hand 1 loses. You lose $%d.\n", p1.currentBet);
+                }
+            } else {
+                printf("Hand 1 busted. You lose $%d.\n", p1.currentBet);
+            }
+    
+
+            if (!hand2Busted) {
+                if (dealerBusted || hand2Value > dealerScore) {
+                    printf("Hand 2 wins! You win $%d!\n", p1.currentBet);
+                    p1.balance += p1.currentBet * 2;
+                    p1.total_winnings += p1.currentBet;
+                } else if (hand2Value == dealerScore) {
+                    printf("Hand 2 push! Your $%d bet is returned.\n", p1.currentBet);
+                    p1.balance += p1.currentBet;
+                } else {
+                    printf("Hand 2 loses. You lose $%d.\n", p1.currentBet);
+                }
+            } else {
+                printf("Hand 2 busted. You lose $%d.\n", p1.currentBet);
+            }
+    
+     
+            user.balance = p1.balance;
+            user.total_winnings = p1.total_winnings;
+            update_balance(conn, user.username, user.balance);
+    
+
+            p1.hasSplit = 1;
+
+            return 0;
         } else {
             printf("Invalid choice. Try again.\n");
         }
@@ -391,6 +542,7 @@ int calc(Card hand[], int *handSize) {
     
     return val;
 }
+
 User user_options(PGconn *conn) {
     char c;
     int b = 50000;
@@ -399,7 +551,7 @@ User user_options(PGconn *conn) {
     char p[20] = {0};
     User user = {0};
 
-    printf("Do you want to register? - you will be able to see your progress and view leaderboards (y/n): ");
+    printf("Do you want to register or login ? - you will be able to see your progress and view leaderboards (y/n): ");
     scanf(" %c", &c);
 
     if (c == 'y' || c == 'Y') {
@@ -424,8 +576,9 @@ User user_options(PGconn *conn) {
     
     return user;
 }
+
 void loading_terminal() {
-	 printf("********************************************\n");
+    printf("********************************************\n");
     printf("*                                          *\n");
     printf("*            WELCOME TO BLACKJACK          *\n");
     printf("*                                          *\n");
@@ -475,10 +628,9 @@ int main() {
     
     char choice;
     do {
-	    if(conn && strcmp(user.username, "Guest") != 0) {
-
-		check_leaderboards(conn);
-	    }
+        if(conn && strcmp(user.username, "Guest") != 0) {
+            check_leaderboards(conn);
+        }
         int result = gameLoop(user, conn);
         if (result == -1 || p1.balance <= 0) {
             if (p1.balance <= 0) {
@@ -493,9 +645,9 @@ int main() {
     } while(choice == 'y' || choice == 'Y');
 
     if(conn && strcmp(user.username, "Guest") != 0) {
-    printf("Thank you for playing - your final balance: $%d\n", p1.balance);
+        printf("Thank you for playing - your final balance: $%d\n", p1.balance);
     } else {
-	printf("Thank you for playing.");
+        printf("Thank you for playing.");
     }
     if (conn && strlen(user.username) > 0 && strcmp(user.username, "Guest") != 0) {
         user.balance = p1.balance;
