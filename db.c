@@ -6,9 +6,8 @@
 #include "db.h"
 
 
-
 PGconn* connect_db(const char *db_uri) {
-    PGconn *conn = PQconnectdb("dbname=blackjack user=admin password=Yoloboyz89# host=localhost port=5432");
+    PGconn *conn = PQconnectdb(db_uri);
     if (PQstatus(conn) == CONNECTION_BAD) {
         fprintf(stderr, "Connection to database failed: %s", PQerrorMessage(conn));
         PQfinish(conn);
@@ -61,7 +60,7 @@ void register_player(PGconn *conn, const char *username, const char *password, c
         4, NULL, paramValues, NULL, NULL, 0);
     
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {  
-        fprintf(stderr, "Failed to add player: %s\n", PQerrorMessage(conn));
+	fprintf(stderr, "Failed to authenticate: %s", PQerrorMessage(conn));
     } else {
         printf("Registered successfully ...\n");
     }
@@ -108,6 +107,7 @@ User authenticate_player(PGconn *conn, const char *username, const char *passwor
             printf("Welcome %s\n", username);
         } else {
             printf("Incorrect password\n");
+	    printf("Please try loggin in with correct credentials");
         }
     }
     
